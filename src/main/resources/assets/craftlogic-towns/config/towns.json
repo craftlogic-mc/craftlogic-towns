@@ -1,0 +1,15 @@
+{
+  "disable-wild-interact": false,
+  "plot-interaction-bypass": [],
+  "enabled-worlds": [
+    "overworld"
+  ],
+  "town": {
+    "nonpayment-fine": 100,
+    "event-broadcast": true,
+    "taxes": {
+
+    },
+    "price": 0
+  }
+}
