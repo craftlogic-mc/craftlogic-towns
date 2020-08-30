@@ -1,24 +1,29 @@
-package ru.craftlogic.towns.commands;
+package ru.craftlogic.towns.common.command;
 
 import net.minecraft.command.CommandException;
-import ru.craftlogic.api.command.Command;
+import ru.craftlogic.api.command.CommandBase;
 import ru.craftlogic.api.command.CommandContext;
-import ru.craftlogic.api.command.CommandRegistrar;
 import ru.craftlogic.api.text.Text;
 import ru.craftlogic.api.world.Player;
 import ru.craftlogic.towns.TownManager;
 import ru.craftlogic.towns.data.Plot;
 import ru.craftlogic.towns.data.Resident;
 
-public class ResidentCommands implements CommandRegistrar {
-    @Command(name = "resident", aliases = "res", syntax = {
-        "",
-        "set warp <name>",
-        "set title <player:Player> <value>...",
-        "set title <value>...",
-        "remove warp|title"
-    })
-    public static void commandResident(CommandContext ctx) throws CommandException {
+import java.util.Collections;
+
+public class CommandResident extends CommandBase {
+    public CommandResident() {
+        super("resident", 0, "",
+            "set warp <name>",
+            "set title <player:Player> <value>...",
+            "set title <value>...",
+            "remove warp|title"
+        );
+        Collections.addAll(aliases, "res");
+    }
+
+    @Override
+    protected void execute(CommandContext ctx) throws Throwable {
         TownManager townManager = ctx.server().getManager(TownManager.class);
         Player player = ctx.senderAsPlayer();
         Resident resident = townManager.getResident(player);
@@ -31,8 +36,7 @@ public class ResidentCommands implements CommandRegistrar {
                             String name = ctx.get("name").asString();
                             Plot plot = townManager.getPlot(player.getLocation());
                             if (plot != null && plot.isOwner(resident)) {
-
-                                resident.sendMessage(
+                                player.sendMessage(
                                     Text.translation("resident.warp.set.success").green()
                                 );
                             } else {
@@ -45,29 +49,27 @@ public class ResidentCommands implements CommandRegistrar {
                             String title = ctx.get("value").asString();
                             if (ctx.has("player")) {
                                 target = townManager.getResident(ctx.get("player").asPlayer());
-                                if (target == null || target.getFirstPlayed() <= 0) {
+                                if (target == null || target.asPhantom(player.getWorld()).getFirstPlayed() <= 0) {
                                     throw new CommandException("commands.generic.player.notFound", ctx.get("player").asString());
                                 }
                             }
                             if (target.getTown() == resident.getTown() && (resident.isAuthority() || player.hasPermission("town.admin"))) {
                                 target.setTitle(title);
                                 if (target == resident) {
-                                    resident.sendMessage(
+                                    player.sendMessage(
                                         Text.translation("resident.title.set.self").green()
                                             .arg(title, Text::darkGreen)
                                     );
                                 } else {
-                                    resident.sendMessage(
+                                    player.sendMessage(
                                         Text.translation("resident.title.set.other").yellow()
                                             .arg(target.getName(), Text::gold)
                                             .arg(title, Text::gold)
                                     );
-                                    if (target.isOnline()) {
-                                        target.sendMessage(
-                                            Text.translation("resident.title.set.self").green()
-                                                .arg(title, Text::darkGreen)
-                                        );
-                                    }
+                                    target.sendMessage(
+                                        Text.translation("resident.title.set.self").green()
+                                            .arg(title, Text::darkGreen)
+                                    );
                                 }
                             } else {
                                 throw new CommandException("town.error.not-a-mayor");

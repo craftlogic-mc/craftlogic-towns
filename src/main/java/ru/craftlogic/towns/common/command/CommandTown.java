@@ -1,11 +1,11 @@
-package ru.craftlogic.towns.commands;
+package ru.craftlogic.towns.common.command;
 
 import net.minecraft.command.CommandException;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.common.MinecraftForge;
-import ru.craftlogic.api.command.*;
-import ru.craftlogic.api.command.CommandContext.Argument;
+import ru.craftlogic.api.command.CommandBase;
+import ru.craftlogic.api.command.CommandContext;
 import ru.craftlogic.api.server.PlayerManager;
 import ru.craftlogic.api.text.Text;
 import ru.craftlogic.api.world.ChunkLocation;
@@ -27,31 +27,35 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-public class TownCommands implements CommandRegistrar {
-    @Command(name = "town", syntax = {
-        "",
-        "here|autoplot|assistants|reload|delete|remove|abandon|ruin|list|leave",
-        "claim",
-        "claim <type:PlotType>",
-        "spawn",
-        "spawn <town:TownWithSpawn>",
-        "delete|remove|abandon|ruin <town:Town>",
-        "join",
-        "join <town:TownOpen>",
-        "create <name>",
-        "invite <target:Player>",
-        "bank",
-        "bank <town:Town>",
-        "bank deposit|withdraw <amount>",
-        "bank deposit|withdraw <amount> <town:Town>",
-        "assistants add|remove <target:Player>",
-        "set public|private|spawn",
-        "set pvp",
-        "set pvp true|false|on|off",
-        "set name <name>",
-        "<town:Town>"
-    })
-    public static void commandTown(CommandContext ctx) throws CommandException {
+public class CommandTown extends CommandBase {
+    public CommandTown() {
+        super("town", 0, "",
+            "here|autoplot|assistants|reload|delete|remove|abandon|ruin|list|leave",
+            "claim",
+            "claim <type:PlotType>",
+            "spawn",
+            "spawn <town:TownWithSpawn>",
+            "delete|remove|abandon|ruin <town:Town>",
+            "join",
+            "join <town:TownOpen>",
+            "create <name>",
+            "invite <target:Player>",
+            "bank",
+            "bank <town:Town>",
+            "bank deposit|withdraw <amount>",
+            "bank deposit|withdraw <amount> <town:Town>",
+            "assistants add|remove <target:Player>",
+            "set public|private|spawn",
+            "set pvp",
+            "set pvp true|false|on|off",
+            "set name <name>",
+            "<town:Town>"
+        );
+        Collections.addAll(aliases, "t");
+    }
+
+    @Override
+    protected void execute(CommandContext ctx) throws Throwable {
         TownManager townManager = ctx.server().getManager(TownManager.class);
         PlayerManager playerManager = ctx.server().getPlayerManager();
         if (ctx.hasAction(0)) {
@@ -142,17 +146,11 @@ public class TownCommands implements CommandRegistrar {
                                 Text.translation("town.join.success").green()
                                     .arg(town.getName(), Text::darkGreen)
                             );
-                            if (townManager.broadcastEvents) {
-                                for (Resident r : town.getOnlineResidents()) {
-                                    if (!r.equals(resident)) {
-                                        r.sendMessage(
-                                            Text.translation("town.join.success-broadcast").green()
-                                                .arg(player.getName(), Text::darkGreen)
-                                                .arg(town.getName(), Text::darkGreen)
-                                        );
-                                    }
-                                }
-                            }
+                            town.broadcast(resident,
+                                Text.translation("town.join.success-broadcast").green()
+                                    .arg(player.getName(), Text::darkGreen)
+                                    .arg(town.getName(), Text::darkGreen)
+                            );
                         } else {
                             throw new CommandException("commands.generic.unknownFailure");
                         }
@@ -171,17 +169,11 @@ public class TownCommands implements CommandRegistrar {
                                 Text.translation("town.leave.success").yellow()
                                     .arg(town.getName(), Text::gold)
                             );
-                            if (townManager.broadcastEvents) {
-                                for (Resident r : town.getOnlineResidents()) {
-                                    if (!r.equals(resident)) {
-                                        r.sendMessage(
-                                            Text.translation("town.leave.success-broadcast").yellow()
-                                                .arg(resident.getName(), Text::gold)
-                                                .arg(town.getName(), Text::gold)
-                                        );
-                                    }
-                                }
-                            }
+                            town.broadcast(resident,
+                                Text.translation("town.leave.success-broadcast").yellow()
+                                    .arg(resident.getName(), Text::gold)
+                                    .arg(town.getName(), Text::gold)
+                            );
                         } else {
                             throw new CommandException("town.leave.has-plots", total);
                         }
@@ -207,18 +199,12 @@ public class TownCommands implements CommandRegistrar {
                                         .arg(targetPlayerName, Text::darkGreen)
                                         .arg(town.getName(), Text::darkGreen)
                                 );
-                                if (townManager.broadcastEvents) {
-                                    for (Resident r : town.getOnlineResidents()) {
-                                        if (!r.equals(resident)) {
-                                            r.sendMessage(
-                                                Text.translation("town.invite.success-broadcast").green()
-                                                    .arg(player.getName(), Text::darkGreen)
-                                                    .arg(targetPlayerName, Text::darkGreen)
-                                                    .arg(town.getName(), Text::darkGreen)
-                                            );
-                                        }
-                                    }
-                                }
+                                town.broadcast(resident,
+                                    Text.translation("town.invite.success-broadcast").green()
+                                        .arg(player.getName(), Text::darkGreen)
+                                        .arg(targetPlayerName, Text::darkGreen)
+                                        .arg(town.getName(), Text::darkGreen)
+                                );
                             } else {
                                 throw new CommandException("town.invite.already", targetPlayerName);
                             }
@@ -287,17 +273,11 @@ public class TownCommands implements CommandRegistrar {
                                     Text.translation("town.create.success").green()
                                         .arg(name, Text::darkGreen)
                                 );
-                                if (townManager.broadcastEvents) {
-                                    for (Resident r : town.getOnlineResidents()) {
-                                        if (!r.equals(resident)) {
-                                            r.sendMessage(
-                                                Text.translation("town.create.success-broadcast").green()
-                                                    .arg(player.getName(), Text::darkGreen)
-                                                    .arg(name, Text::darkGreen)
-                                            );
-                                        }
-                                    }
-                                }
+                                town.broadcast(resident,
+                                    Text.translation("town.create.success-broadcast").green()
+                                        .arg(player.getName(), Text::darkGreen)
+                                        .arg(name, Text::darkGreen)
+                                );
                                 CraftTowns.NETWORK.broadcast(town.serialize());
                                 for (Player p : playerManager.getAllOnline()) {
                                     Resident r = townManager.getResident(p);
@@ -317,18 +297,18 @@ public class TownCommands implements CommandRegistrar {
                 case "claim": {
                     Player player = ctx.senderAsPlayer();
                     Resident resident = townManager.getResident(player);
-                    TownWorld tw = townManager.getWorld(resident.getWorld().getDimension());
+                    TownWorld tw = townManager.getWorld(player.getWorld());
                     if (tw == null) {
                         throw new CommandException("town.disabled-in-world");
                     }
                     if (resident.isMayor() || resident.isAssistant()) {
                         Town town = resident.getTown();
-                        ChunkLocation location = new ChunkLocation(resident.getLocation());
+                        ChunkLocation location = new ChunkLocation(player.getLocation());
                         if (townManager.getPlot(location) != null) {
                             throw new CommandException("town.claim.already");
                         }
-                        PlotType type = TownManager.findPlotType(ctx.getIfPresent("type", Argument::asString)
-                                .orElse("default"));
+                        PlotType type = TownManager.findPlotType(ctx.getIfPresent("type", CommandContext.Argument::asString)
+                            .orElse("default"));
                         if (type == null) {
                             throw new CommandException("town.error.unknown-plot-type");
                         }
@@ -438,7 +418,7 @@ public class TownCommands implements CommandRegistrar {
                                     Resident target = townManager.getResident(ctx.get("target").asPlayer());
                                     String targetPlayerName = target.getName();
                                     if (town.addAssistant(target.getId())) {
-                                        resident.sendMessage(
+                                        player.sendMessage(
                                             Text.translation("town.assistants.new").green()
                                                 .arg(targetPlayerName, Text::darkGreen)
                                         );
@@ -473,7 +453,7 @@ public class TownCommands implements CommandRegistrar {
                                 String townName = ctx.get("town").asString();
                                 Town town = townManager.getTown(townName);
                                 if (town != null) {
-                                    sendAssistants(town, townManager, resident);
+                                    sendAssistants(town, townManager, player);
                                 } else {
                                     throw new CommandException("town.error.no-town", townName);
                                 }
@@ -485,7 +465,7 @@ public class TownCommands implements CommandRegistrar {
                         if (town == null) {
                             throw new CommandException("town.error.not-a-resident");
                         } else {
-                            sendAssistants(town, townManager, resident);
+                            sendAssistants(town, townManager, player);
                         }
                     }
                     break;
@@ -560,16 +540,10 @@ public class TownCommands implements CommandRegistrar {
                                         Text.translation("town.delete.success").yellow()
                                             .arg(town.getName(), Text::gold)
                                     );
-                                    if (townManager.broadcastEvents) {
-                                        for (Resident r : town.getOnlineResidents()) {
-                                            if (!(ctx.sender() instanceof Player) || !ctx.senderAsPlayer().getId().equals(r.getId())) {
-                                                r.sendMessage(
-                                                    Text.translation("town.delete.success-broadcast").yellow()
-                                                        .arg(town.getName(), Text::gold)
-                                                );
-                                            }
-                                        }
-                                    }
+                                    town.broadcast(ctx.sender(),
+                                        Text.translation("town.delete.success-broadcast").yellow()
+                                            .arg(town.getName(), Text::gold)
+                                    );
                                 } catch (IOException e) {
                                     e.printStackTrace();
                                 }
@@ -591,16 +565,10 @@ public class TownCommands implements CommandRegistrar {
                                             Text.translation("town.delete.success").yellow()
                                                 .arg(town.getName(), Text::gold)
                                         );
-                                        if (townManager.broadcastEvents) {
-                                            for (Resident r : town.getOnlineResidents()) {
-                                                if (!r.getId().equals(player.getId())) {
-                                                    r.sendMessage(
-                                                        Text.translation("town.delete.success-broadcast").yellow()
-                                                            .arg(town.getName(), Text::gold)
-                                                    );
-                                                }
-                                            }
-                                        }
+                                        town.broadcast(player,
+                                            Text.translation("town.delete.success-broadcast").yellow()
+                                                .arg(town.getName(), Text::gold)
+                                        );
                                         return;
                                     } catch (IOException e) {
                                         e.printStackTrace();
@@ -645,7 +613,7 @@ public class TownCommands implements CommandRegistrar {
                             TownRenameEvent event = new TownRenameEvent(town, oldName, newName);
                             if (!MinecraftForge.EVENT_BUS.post(event)) {
                                 town.setName(newName);
-                                resident.sendMessage("Renamed town '" + oldName + "' to '" + newName + "'");
+                                player.sendMessage("Renamed town '" + oldName + "' to '" + newName + "'");
                                 CraftTowns.NETWORK.broadcast(town.serialize());
                             }
                             break;
@@ -653,28 +621,28 @@ public class TownCommands implements CommandRegistrar {
                         case "public": {
                             if (!town.isOpen()) {
                                 town.setOpen(true);
-                                resident.sendMessage("Now " + town.getName() + " is public!");
+                                player.sendMessage("Now " + town.getName() + " is public!");
                             } else {
-                                resident.sendMessage("Already public!");
+                                player.sendMessage("Already public!");
                             }
                             break;
                         }
                         case "private": {
                             if (town.isOpen()) {
                                 town.setOpen(false);
-                                resident.sendMessage("Now " + town.getName() + " is private!");
+                                player.sendMessage("Now " + town.getName() + " is private!");
                             } else {
-                                resident.sendMessage("Already private!");
+                                player.sendMessage("Already private!");
                             }
                             break;
                         }
                         case "pvp": {
                             boolean value = ctx.hasAction(2)
-                                    ? ctx.action(2).equalsIgnoreCase("on") || ctx.action(2).equalsIgnoreCase("true")
-                                    : !town.isPvP();
+                                ? ctx.action(2).equalsIgnoreCase("on") || ctx.action(2).equalsIgnoreCase("true")
+                                : !town.isPvP();
 
                             town.setPvP(value);
-                            resident.sendMessage("PvP " + (value ? "enabled" : "disabled"));
+                            player.sendMessage("PvP " + (value ? "enabled" : "disabled"));
                             break;
                         }
                     }
@@ -717,7 +685,7 @@ public class TownCommands implements CommandRegistrar {
             if (!resident.hasTown()) {
                 throw new CommandException("town.error.not-a-resident");
             } else {
-                townManager.sendTownInfo(resident.getTown(), resident);
+                townManager.sendTownInfo(resident.getTown(), player);
             }
         }
     }
@@ -741,64 +709,5 @@ public class TownCommands implements CommandRegistrar {
                 .arg(town.getMayor().getName(), Text::gold)
                 .arg(assistants.isEmpty() ? Text.translation("resident.no-one") : list)
         );
-    }
-
-    @ArgumentCompleter(type = "Town")
-    public static Set<String> completerTown(ArgumentCompletionContext ctx) {
-        return Collections.emptySet();
-    }
-
-    @ArgumentCompleter(type = "TownWithSpawn")
-    public static Set<String> completerTownWithSpawn(ArgumentCompletionContext ctx) throws CommandException {
-        TownManager townManager = ctx.server().getManager(TownManager.class);
-        Player player = ctx.senderAsPlayer();
-        Resident resident = townManager.getResident(player);
-        Set<String> result = new HashSet<>();
-        String partial = ctx.partialName();
-        for (TownWorld world : townManager.getAllWorlds()) {
-            for (Town town : world.getAllTowns()) {
-                if (partial.isEmpty() || town.getName().toLowerCase().startsWith(partial)) {
-                    if (town.hasSpawnpoint() || town.isOpen() || town.hasResident(resident)
-                            || resident.hasPermission("town.private-bypass")) {
-
-                        result.add(town.getName());
-                    }
-                }
-            }
-        }
-        return result;
-    }
-
-    @ArgumentCompleter(type = "TownOpen")
-    public static Set<String> completerTownOpen(ArgumentCompletionContext ctx) throws CommandException {
-        TownManager townManager = ctx.server().getManager(TownManager.class);
-        Player player = ctx.senderAsPlayer();
-        Resident resident = townManager.getResident(player);
-        Set<String> result = new HashSet<>();
-        String partial = ctx.partialName();
-        for (TownWorld world : townManager.getAllWorlds()) {
-            for (Town town : world.getAllTowns()) {
-                if (partial.isEmpty() || town.getName().toLowerCase().startsWith(partial)) {
-                    if (town.isOpen() || town.hasResident(resident) || resident.hasPermission("town.private-bypass")) {
-                        result.add(town.getName());
-                    }
-                }
-            }
-        }
-        return result;
-    }
-
-    @ArgumentCompleter(type = "PlotType")
-    public static Set<String> completerPlotType(ArgumentCompletionContext ctx) {
-        Set<String> result = new HashSet<>();
-        String partial = ctx.partialName();
-        for (PlotType type : TownManager.PLOT_TYPES) {
-            for (String a : type.getNames()) {
-                if (partial.isEmpty() || a.startsWith(partial)) {
-                    result.add(a);
-                }
-            }
-        }
-        return result;
     }
 }

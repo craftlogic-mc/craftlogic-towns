@@ -11,6 +11,7 @@ import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.client.FMLClientHandler;
 import net.minecraftforge.fml.common.Loader;
+import net.minecraftforge.fml.common.Optional;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 import net.minecraftforge.fml.relauncher.Side;
@@ -52,8 +53,13 @@ public class ProxyClient extends ProxyCommon {
     public void postInit() {
         super.postInit();
         if (Loader.isModLoaded(Reference.MOD_ID)) {
-            MapWriterAPI.registerDataProvider("towns", new TownOverlayProvider());
+            loadMapwriterCompat();
         }
+    }
+
+    @Optional.Method(modid = Reference.MOD_ID)
+    private void loadMapwriterCompat() {
+        MapWriterAPI.registerDataProvider("towns", new TownOverlayProvider());
     }
 
     @SubscribeEvent

@@ -6,15 +6,15 @@ import com.google.gson.JsonObject;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.util.JsonUtils;
 import net.minecraftforge.common.MinecraftForge;
-import ru.craftlogic.api.world.ChunkLocation;
-import ru.craftlogic.api.world.Location;
-import ru.craftlogic.api.world.OfflinePlayer;
+import ru.craftlogic.api.text.Text;
+import ru.craftlogic.api.world.*;
 import ru.craftlogic.towns.CraftTowns;
 import ru.craftlogic.towns.TownManager;
 import ru.craftlogic.towns.event.TownAddResidentEvent;
 import ru.craftlogic.towns.event.TownRemoveResidentEvent;
 import ru.craftlogic.towns.network.message.MessageTown;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
@@ -352,6 +352,16 @@ public class Town implements PlotOwner {
     public void setPvP(boolean pvp) {
         this.dirty = true;
         this.pvp = pvp;
+    }
+
+    public void broadcast(@Nullable CommandSender exception, Text<?, ?> message) {
+        if (townManager.broadcastEvents) {
+            for (Resident r : getOnlineResidents()) {
+                if (!(exception instanceof Player) || !((Player) exception).getId().equals(r.getId())) {
+                    r.sendMessage(message);
+                }
+            }
+        }
     }
 
     public boolean hasResident(OfflinePlayer player) {

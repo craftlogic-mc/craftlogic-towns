@@ -1,5 +1,6 @@
 package ru.craftlogic.towns;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.minecraft.block.BlockLiquid;
@@ -22,9 +23,9 @@ import ru.craftlogic.api.text.Text;
 import ru.craftlogic.api.util.ConfigurableManager;
 import ru.craftlogic.api.world.*;
 import ru.craftlogic.common.command.CommandManager;
-import ru.craftlogic.towns.commands.PlotCommands;
-import ru.craftlogic.towns.commands.ResidentCommands;
-import ru.craftlogic.towns.commands.TownCommands;
+import ru.craftlogic.towns.common.command.CommandPlot;
+import ru.craftlogic.towns.common.command.CommandResident;
+import ru.craftlogic.towns.common.command.CommandTown;
 import ru.craftlogic.towns.data.Bank;
 import ru.craftlogic.towns.data.Nation;
 import ru.craftlogic.towns.data.Plot;
@@ -147,9 +148,81 @@ public class TownManager extends ConfigurableManager {
 
     @Override
     public void registerCommands(CommandManager commandManager) {
-        commandManager.registerCommandContainer(TownCommands.class);
-        commandManager.registerCommandContainer(PlotCommands.class);
-        commandManager.registerCommandContainer(ResidentCommands.class);
+        commandManager.registerArgumentType("Town", false, ctx -> Collections.emptySet());
+        commandManager.registerArgumentType("TownWithSpawn", false, ctx -> {
+            TownManager townManager = ctx.server().getManager(TownManager.class);
+            Player player = ctx.senderAsPlayer();
+            Resident resident = townManager.getResident(player);
+            Set<String> result = new HashSet<>();
+            String partial = ctx.partialName();
+            for (TownWorld world : townManager.getAllWorlds()) {
+                for (Town town : world.getAllTowns()) {
+                    if (partial.isEmpty() || town.getName().toLowerCase().startsWith(partial)) {
+                        if (town.hasSpawnpoint() || town.isOpen() || town.hasResident(resident)
+                            || resident.hasPermission("town.private-bypass")) {
+
+                            result.add(town.getName());
+                        }
+                    }
+                }
+            }
+            return result;
+        });
+        commandManager.registerArgumentType("TownOpen", false, ctx -> {
+            TownManager townManager = ctx.server().getManager(TownManager.class);
+            Player player = ctx.senderAsPlayer();
+            Resident resident = townManager.getResident(player);
+            Set<String> result = new HashSet<>();
+            String partial = ctx.partialName();
+            for (TownWorld world : townManager.getAllWorlds()) {
+                for (Town town : world.getAllTowns()) {
+                    if (partial.isEmpty() || town.getName().toLowerCase().startsWith(partial)) {
+                        if (town.isOpen() || town.hasResident(resident) || resident.hasPermission("town.private-bypass")) {
+                            result.add(town.getName());
+                        }
+                    }
+                }
+            }
+            return result;
+        });
+        commandManager.registerArgumentType("PlotType", false, ctx -> {
+            Set<String> result = new HashSet<>();
+            String partial = ctx.partialName();
+            for (PlotType type : TownManager.PLOT_TYPES) {
+                for (String a : type.getNames()) {
+                    if (partial.isEmpty() || a.startsWith(partial)) {
+                        result.add(a);
+                    }
+                }
+            }
+            return result;
+        });
+        commandManager.registerArgumentType("PlotOptions", false, ctx -> {
+            TownManager townManager = ctx.server().getManager(TownManager.class);
+            Player player = ctx.senderAsPlayer();
+            Resident resident = townManager.getResident(player);
+            Plot plot = townManager.getPlot(player.getLocation());
+            if (plot.isOwner(resident) || plot.hasTown() && plot.getTown().isMayor(resident)
+                || player.hasPermission("town.admin")) {
+
+                String partial = ctx.partialName();
+
+                List<String> result = new ArrayList<>();
+                for (PlotOption o : TownManager.PLOT_OPTIONS) {
+                    for (String a : o.getNames()) {
+                        if (partial.isEmpty() || a.startsWith(partial)) {
+                            result.add(a);
+                        }
+                    }
+                }
+                return result;
+            }
+            return Collections.emptyList();
+        });
+        commandManager.registerCommand(new CommandTown());
+        commandManager.registerCommand(new CommandResident());
+        commandManager.registerCommand(new CommandPlot());
+
     }
 
     @Override
@@ -231,6 +304,30 @@ public class TownManager extends ConfigurableManager {
                 e.printStackTrace();
             }
         }
+
+        config.addProperty("disable-wild-interact", disableWildInteract);
+        JsonArray plotInteractionBypass = new JsonArray();
+        for (String pib : this.plotInteractionBypass) {
+            plotInteractionBypass.add(pib);
+        }
+        config.add("plot-interaction-bypass", plotInteractionBypass);
+        JsonArray enabledWorlds = new JsonArray();
+        for (String pib : this.enabledWorlds) {
+            enabledWorlds.add(pib);
+        }
+        config.add("enabled-worlds", enabledWorlds);
+
+        JsonObject town = new JsonObject();
+        town.addProperty("nonpayment-fine", nonpaymentFine);
+        town.addProperty("event-broadcast", broadcastEvents);
+        town.addProperty("price", townCreationPrice);
+
+        JsonObject taxes = new JsonObject();
+        for (PlotType type : PLOT_TYPES) {
+            taxes.addProperty(type.getNames().get(0), plotTaxes.getOrDefault(type, 0F));
+        }
+        town.add("taxes", taxes);
+        config.add("town", town);
     }
 
     @Override
@@ -325,19 +422,15 @@ public class TownManager extends ConfigurableManager {
     }
 
     private void expireInvitation(UUID u) {
-        Resident resident = this.getResident(u);
-        if (resident.isOnline()) {
-            resident.sendMessage(Text.translation("resident.invitation-expired").red());
-        }
+        Resident resident = getResident(u);
+        resident.sendMessage(Text.translation("resident.invitation-expired").red());
     }
 
     private boolean withdrawTax(Town town, Bank bank, Resident resident, Plot plot) throws CommandException {
         float tax = this.plotTaxes.getOrDefault(plot.getType(), 0F);
         return tax == 0 || resident.withdrawMoney(tax, (amt, success, fmt) -> {
-            if (resident.isOnline()) {
-                String msg = "plot.tax.pay." + (success ? "unable" : "success");
-                resident.sendMessage(msg, fmt.apply(amt), plot.getLocation());
-            }
+            String msg = "plot.tax.pay." + (success ? "unable" : "success");
+            resident.sendMessage(msg, fmt.apply(amt), plot.getLocation());
             if (success) {
                 bank.deposit(amt);
             }
@@ -436,6 +529,10 @@ public class TownManager extends ConfigurableManager {
         return this.worlds.get(dimension);
     }
 
+    public TownWorld getWorld(World world) {
+        return this.worlds.get(world.getDimension());
+    }
+
     public Set<TownWorld> getAllWorlds() {
         return new HashSet<>(this.worlds.values());
     }
@@ -480,15 +577,15 @@ public class TownManager extends ConfigurableManager {
     public boolean sendInvitation(Resident inviter, Resident target, Town town) {
         if (!this.pendingInvitations.containsKey(target.getId())) {
             this.pendingInvitations.put(target.getId(), town.getId());
-            target.sendQuestion("town-invitation:" + town.getName(),
+            target.asOnline().sendQuestion("town-invitation:" + town.getName(),
                 Text.translation("town.invite.message.header").yellow()
                     .arg(inviter.getName(), Text::gold)
                     .arg(town.getName(), Text::gold),
                     120000,
                     accepted -> {
+                        Town t = getInvitation(target);
                         if (accepted) {
-                            Town t = getInvitation(target);
-                            if (t != null) {
+                            if (t != null && target.isOnline()) {
                                 TownResidentAcceptedInvitationEvent event = new TownResidentAcceptedInvitationEvent(t, target);
                                 if (!MinecraftForge.EVENT_BUS.post(event)) {
                                     if (t.addResident(target)) {
@@ -496,23 +593,21 @@ public class TownManager extends ConfigurableManager {
                                             Text.translation("town.join.success").green()
                                                 .arg(t.getName(), Text::darkGreen)
                                         );
-                                        if (broadcastEvents) {
-                                            for (Resident r : t.getOnlineResidents()) {
-                                                if (r != target) {
-                                                    r.sendMessage(
-                                                        Text.translation("town.join.success-broadcast").green()
-                                                            .arg(target.getName(), Text::darkGreen)
-                                                            .arg(t.getName(), Text::darkGreen)
-                                                    );
-                                                }
-                                            }
-                                        }
+                                        t.broadcast(target,
+                                            Text.translation("town.join.success-broadcast").green()
+                                                .arg(target.getName(), Text::darkGreen)
+                                                .arg(t.getName(), Text::darkGreen)
+                                        );
                                         CraftTowns.NETWORK.broadcast(town.serialize());
                                     } else {
                                         target.sendMessage(
                                             Text.translation("commands.generic.unknownFailure").red()
                                         );
                                     }
+                                } else {
+                                    target.sendMessage(
+                                        Text.string("Event canceled").green()
+                                    );
                                 }
                             } else {
                                 target.sendMessage(
@@ -520,7 +615,6 @@ public class TownManager extends ConfigurableManager {
                                 );
                             }
                         } else {
-                            Town t = getInvitation(target);
                             if (t == null) {
                                 target.sendMessage(
                                     Text.translation("town.invite.no-pending").red()

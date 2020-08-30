@@ -1,12 +1,12 @@
-package ru.craftlogic.towns.commands;
+package ru.craftlogic.towns.common.command;
 
 import net.minecraft.block.Block;
 import net.minecraft.command.CommandException;
 import net.minecraft.init.Blocks;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.MinecraftForge;
-import ru.craftlogic.api.command.*;
-import ru.craftlogic.api.command.CommandContext.Argument;
+import ru.craftlogic.api.command.CommandBase;
+import ru.craftlogic.api.command.CommandContext;
 import ru.craftlogic.api.server.PlayerManager;
 import ru.craftlogic.api.text.Text;
 import ru.craftlogic.api.world.ChunkLocation;
@@ -22,22 +22,28 @@ import ru.craftlogic.towns.data.plot.options.PlotOption;
 import ru.craftlogic.towns.event.PlotOptionUpdateEvent;
 import ru.craftlogic.towns.event.PlotUpdateEvent;
 
-import java.util.*;
+import java.util.EnumSet;
+import java.util.Set;
+import java.util.StringJoiner;
+import java.util.UUID;
 
-public class PlotCommands implements CommandRegistrar {
-    @Command(name = "plot", syntax = {
-        "",
-        "option <option:PlotOption> <value>...",
-        "backup|restore|abandon|claim|unlock|stopselling|ss",
-        "expel <target:Player>",
-        "border",
-        "border <block:Block>",
-        "lock",
-        "lock <price>",
-        "sell",
-        "sell <price>"
-    })
-    public static void commandPlot(CommandContext ctx) throws CommandException {
+public class CommandPlot extends CommandBase {
+    public CommandPlot() {
+        super("plot", 0, "",
+            "option <option:PlotOption> <value>...",
+            "backup|restore|abandon|claim|unlock|stopselling|ss",
+            "expel <target:Player>",
+            "border",
+            "border <block:Block>",
+            "lock",
+            "lock <price>",
+            "sell",
+            "sell <price>"
+        );
+    }
+
+    @Override
+    protected void execute(CommandContext ctx) throws Throwable {
         TownManager townManager = ctx.server().getManager(TownManager.class);
         PlayerManager playerManager = ctx.server().getPlayerManager();
         Player player = ctx.senderAsPlayer();
@@ -68,14 +74,12 @@ public class PlotCommands implements CommandRegistrar {
                                         plot.setOwner(resident);
                                         if (oldOwner != null) {
                                             oldOwner.depositMoney(amt);
-                                            if (oldOwner.isOnline()) {
-                                                oldOwner.sendMessage(
-                                                    Text.translation("plot.claim.success-owner").green()
-                                                        .arg(resident.getName(), Text::darkGreen)
-                                                        .arg(plot.getLocation().toString(), Text::darkGreen)
-                                                        .arg(fmt.apply(amt).darkGreen())
-                                                );
-                                            }
+                                            oldOwner.sendMessage(
+                                                Text.translation("plot.claim.success-owner").green()
+                                                    .arg(resident.getName(), Text::darkGreen)
+                                                    .arg(plot.getLocation().toString(), Text::darkGreen)
+                                                    .arg(fmt.apply(amt).darkGreen())
+                                            );
                                         } else if (plot.hasTown()) {
                                             Town town = plot.getTown();
                                             Bank bank = town.getBank();
@@ -84,7 +88,7 @@ public class PlotCommands implements CommandRegistrar {
                                             }
                                             //...
                                         }
-                                        resident.sendMessage(
+                                        player.sendMessage(
                                             Text.translation("plot.unlock.successul").green()
                                         );
                                     } else {
@@ -115,12 +119,12 @@ public class PlotCommands implements CommandRegistrar {
                                 }
                             }
                             if (plots.size() > 1) {
-                                resident.sendMessage(
+                                player.sendMessage(
                                     Text.translation("plot.claim.success.nearby-locked").green()
                                         .arg(plots.size() - 1, Text::darkGreen)
                                 );
                             } else {
-                                resident.sendMessage(
+                                player.sendMessage(
                                     Text.translation("plot.claim.success.alone").green()
                                 );
                             }
@@ -145,12 +149,12 @@ public class PlotCommands implements CommandRegistrar {
                                 plot.setPrice(price);
                                 plot.getWorld().markDirty();
                                 if (price > 0) {
-                                    resident.sendMessage(
+                                    player.sendMessage(
                                         Text.translation("plot.sell.ok.price").yellow()
                                             .arg(townManager.price(price).gold())
                                     );
                                 } else {
-                                    resident.sendMessage(
+                                    player.sendMessage(
                                         Text.translation("plot.sell.ok.free").yellow()
                                     );
                                 }
@@ -176,7 +180,7 @@ public class PlotCommands implements CommandRegistrar {
                         } else if (plot.isOwner(resident) || plot.hasTown() && plot.getTown().isAuthority(resident)) {
                             if (plot.isForSale()) {
                                 plot.setForSale(false);
-                                resident.sendMessage(
+                                player.sendMessage(
                                     Text.translation("plot.stop-selling.ok").yellow()
                                 );
                                 plot.getWorld().markDirty();
@@ -196,23 +200,25 @@ public class PlotCommands implements CommandRegistrar {
                         break;
                     }
                     case "border": {
-                        Block block = ctx.getIfPresent("block", Argument::asBlock).orElse(Blocks.STONE_SLAB);
+                        Block block = ctx.getIfPresent("block", CommandContext.Argument::asBlock).orElse(Blocks.STONE_SLAB);
                         if (ctx.checkPermission(true, "town.admin", 2)) {
                             World world = plot.getWorld().unwrap();
+                            boolean successful = false;
                             Set<Plot> plots = plot.findNearbyPlots(p -> p.hasOwner() || p.isForSale());
                             for (Plot p : plots) {
                                 ChunkLocation l = p.getLocation();
                                 for (EnumFacing face : EnumFacing.values()) {
                                     ChunkLocation lo = l.offset(face);
                                     Plot po = townManager.getPlot(lo);
-                                    if (po == null) {
+                                    if (po == null || po.isForSale() || po.hasOwner()) {
+                                        successful = true;
                                         for (int x = 0; x < 16; x++) {
                                             for (int z = 0; z < 16; z++) {
                                                 int y = world.getTerrainHeight(lo.getChunkX() << 4 + x, lo.getChunkZ() << 4 + z);
                                                 if (face == EnumFacing.NORTH && z == 0
-                                                        || face == EnumFacing.SOUTH && z == 15
-                                                        || face == EnumFacing.WEST && x == 15
-                                                        || face == EnumFacing.EAST && x == 0) {
+                                                    || face == EnumFacing.SOUTH && z == 15
+                                                    || face == EnumFacing.WEST && x == 15
+                                                    || face == EnumFacing.EAST && x == 0) {
                                                     world.getLocation(x, y, z).setBlock(block);
                                                 }
                                             }
@@ -220,7 +226,11 @@ public class PlotCommands implements CommandRegistrar {
                                     }
                                 }
                             }
-                            resident.sendMessage("Border generation successful!");
+                            if (successful) {
+                                player.sendMessage("Border generation successful!");
+                            } else {
+                                player.sendMessage("Border generation failed");
+                            }
                         }
                         break;
                     }
@@ -235,7 +245,7 @@ public class PlotCommands implements CommandRegistrar {
                                 }
                                 plot.setLocked(true);
                                 plot.getWorld().markDirty();
-                                resident.sendMessage(
+                                player.sendMessage(
                                     Text.translation("plot.lock.successful").yellow()
                                 );
                                 MinecraftForge.EVENT_BUS.post(new PlotUpdateEvent(plot));
@@ -259,7 +269,7 @@ public class PlotCommands implements CommandRegistrar {
                             if (!plot.isOwner(resident)) {
                                 if (plot.hasTown() && plot.getTown().isAuthority(resident) || player.hasPermission("town.admin")) {
                                     plot.setLocked(false);
-                                    resident.sendMessage(
+                                    player.sendMessage(
                                         Text.translation("plot.unlock.successul").green()
                                     );
                                 } else {
@@ -281,7 +291,7 @@ public class PlotCommands implements CommandRegistrar {
                                                 }
                                                 //...
                                             }
-                                            resident.sendMessage(
+                                            player.sendMessage(
                                                 Text.translation("plot.unlock.successul").green()
                                             );
                                         } else {
@@ -297,7 +307,7 @@ public class PlotCommands implements CommandRegistrar {
                         if (plot.isOwner(resident) || plot.hasTown() && plot.getTown().isAuthority(resident) || player.hasPermission("town.admin")) {
                             plot.setOwner((UUID) null);
                             plot.setLocked(false);
-                            resident.sendMessage(
+                            player.sendMessage(
                                 Text.translation("plot.abandon.success").gray()
                             );
                             plot.getWorld().markDirty();
@@ -329,7 +339,7 @@ public class PlotCommands implements CommandRegistrar {
                                     String oldValue = option.get(plot);
                                     option.set(townManager, resident, ctx.get("value"), plot);
                                     String newValue = option.get(plot);
-                                    resident.sendMessage(
+                                    player.sendMessage(
                                         Text.translation("plot.option.set").yellow()
                                             .arg(optionName, Text::gold)
                                             .arg(newValue, Text::gold)
@@ -339,7 +349,7 @@ public class PlotCommands implements CommandRegistrar {
                                     MinecraftForge.EVENT_BUS.post(event);
                                 } else {
                                     Text<?, ?> formattedValue = option.getFormatted(townManager, plot);
-                                    resident.sendMessage(
+                                    player.sendMessage(
                                         Text.translation("plot.option.info").yellow()
                                             .arg(formattedValue.build(), Text::gold)
                                     );
@@ -352,7 +362,7 @@ public class PlotCommands implements CommandRegistrar {
                                             String value = ctx.get("value").asString();
                                             if (value.trim().equalsIgnoreCase("none")) {
                                                 plot.setPermission(permission, EnumSet.noneOf(Plot.AccessLevel.class));
-                                                resident.sendMessage(
+                                                player.sendMessage(
                                                     Text.translation("plot.option.cleared").yellow()
                                                         .arg(permission.getName(), Text::gold)
                                                 );
@@ -368,7 +378,7 @@ public class PlotCommands implements CommandRegistrar {
                                                     }
                                                 }
 
-                                                resident.sendMessage(
+                                                player.sendMessage(
                                                     Text.translation("plot.option.set").yellow()
                                                         .arg(permission.getName(), Text::gold)
                                                         .arg(lvls.toString(), Text::gold)
@@ -381,7 +391,7 @@ public class PlotCommands implements CommandRegistrar {
                                             for (Plot.AccessLevel accessLevel : plot.getPermission(permission)) {
                                                 lvls.add(accessLevel.name().toLowerCase());
                                             }
-                                            resident.sendMessage(
+                                            player.sendMessage(
                                                 Text.translation("plot.option.info").yellow()
                                                     .arg(permission.getName(), Text::gold)
                                                     .arg(lvls.toString(), Text::gold)
@@ -399,25 +409,25 @@ public class PlotCommands implements CommandRegistrar {
                     }
                     case "expel": {
                         if (plot.isOwner(resident) || plot.hasTown() && plot.getTown().isAuthority(resident)
-                                || player.hasPermission("town.admin")) {
+                            || player.hasPermission("town.admin")) {
 
                             Player target = ctx.get("target").asPlayer();
                             String targetName = target.getName();
                             Resident tr = townManager.getResident(target);
                             if (!(plot.hasTown() && plot.getTown().isAuthority(tr)) && !tr.hasPermission("town.admin")) {
-                                if (plot.getLocation().equals(tr.getLocation())) {
-                                    if (tr.getBedLocation() != null) {
-                                        tr.teleport(tr.getBedLocation());
+                                if (plot.getLocation().equals(target.getLocation())) {
+                                    if (target.getBedLocation() != null) {
+                                        target.teleport(target.getBedLocation());
                                     } else if (tr.hasTown() && tr.getTown().hasSpawnpoint()) {
-                                        tr.teleport(tr.getTown().getSpawnpoint());
+                                        target.teleport(tr.getTown().getSpawnpoint());
                                     } else {
-                                        tr.teleport(tr.getWorld().getSpawnLocation());
+                                        target.teleport(target.getWorld().getSpawnLocation());
                                     }
-                                    resident.sendMessage(
+                                    player.sendMessage(
                                         Text.translation("plot.expel.success.owner").green()
                                             .arg(targetName, Text::darkGreen)
                                     );
-                                    tr.sendMessage(
+                                    target.sendMessage(
                                         Text.translation("plot.expel.success.self").red()
                                             .arg(resident.getName(), Text::darkRed)
                                     );
@@ -453,36 +463,5 @@ public class PlotCommands implements CommandRegistrar {
         } else {
             throw new CommandException("plot.error.no-plot-here");
         }
-    }
-
-    @ArgumentCompleter(type = "PlotOption")
-    public static List<String> completerOption(ArgumentCompletionContext ctx) throws CommandException {
-        TownManager townManager = ctx.server().getManager(TownManager.class);
-        Player player = ctx.senderAsPlayer();
-        Resident resident = townManager.getResident(player);
-        Plot plot = townManager.getPlot(player.getLocation());
-        if (plot.isOwner(resident) || plot.hasTown() && plot.getTown().isMayor(resident)
-                || player.hasPermission("town.admin")) {
-
-            String partial = ctx.partialName();
-
-            List<String> result = new ArrayList<>();
-            for (PlotOption o : TownManager.PLOT_OPTIONS) {
-                for (String a : o.getNames()) {
-                    if (partial.isEmpty() || a.startsWith(partial)) {
-                        result.add(a);
-                    }
-                }
-            }
-            return result;
-
-            /*PlotOption option = TownManager.findPlotOption(partial);
-            if (option != null) {
-                return option.complete(ctx);
-            } else {
-
-            }*/
-        }
-        return Collections.emptyList();
     }
 }

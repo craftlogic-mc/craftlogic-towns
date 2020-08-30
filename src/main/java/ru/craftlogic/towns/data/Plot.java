@@ -14,6 +14,9 @@ import ru.craftlogic.towns.data.plot.types.PlotType;
 import ru.craftlogic.towns.network.message.MessagePlot;
 
 import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Predicate;
 
@@ -138,23 +141,27 @@ public class Plot {
         }
     }
 
-    /*public boolean hasBackup() {
+    public boolean hasBackup() {
         Path worldDir = this.world.getDir();
-        return new File(worldDir, "plots/" + this.getLocation().toLong() + ".dat").exists();
+        return Files.exists(worldDir.resolve("plots/" + getLocation().getChunkX() + "." + getLocation().getChunkZ() + ".dat"));
     }
 
     public boolean createBackup(boolean overwrite) {
         Path worldDir = this.world.getDir();
-        File backupDir = new File(worldDir, "plots/");
-        if (!backupDir.exists()) {
-            backupDir.mkdir();
+        Path backupDir = worldDir.resolve("plots/");
+        if (!Files.exists(backupDir)) {
+            try {
+                Files.createDirectory(backupDir);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
         ChunkLocation location = this.getLocation();
-        File file = new File(backupDir, location.toLong() + ".dat");
-        if (!file.exists() || overwrite) {
-            NBTContainerChunk chunk = new NBTContainerChunk(location.getChunk());
+        Path file = backupDir.resolve(location.getChunkX() + "." + location.getChunkZ() + ".dat");
+        if (!Files.exists(file) || overwrite) {
+            /*NBTContainerChunk chunk = new NBTContainerChunk(location.getChunk());
             new NBTContainerFile(file).writeTag(chunk.readTag());
-            return true;
+            return true;*/
         }
         return false;
     }
@@ -162,14 +169,16 @@ public class Plot {
     public boolean loadBackup() {
         Path worldDir = this.world.getDir();
         ChunkLocation location = this.getLocation();
-        File file = new File(worldDir, "plots/" + location.toLong() + ".dat");
-        if (file.exists()) {
+        Path file = worldDir.resolve("plots/" + location.getChunkX() + "." + location.getChunkZ() + ".dat");
+        if (Files.exists(file)) {
+            /*AnvilChunkLoader.readChunkEntity()
+            location.getChunk().markDirty();
             NBTContainerChunk chunk = new NBTContainerChunk(location.getChunk());
-            chunk.writeTag(new NBTContainerFile(file).readTag());
+            chunk.writeTag(new NBTContainerFile(file).readTag());*/
             return true;
         }
         return false;
-    }*/
+    }
 
     public ChunkLocation getLocation() {
         return location;

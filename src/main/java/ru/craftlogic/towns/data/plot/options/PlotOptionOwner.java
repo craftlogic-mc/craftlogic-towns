@@ -24,7 +24,7 @@ public class PlotOptionOwner extends PlotOption {
     @Override
     public void set(TownManager townManager, Resident resident, CommandContext.Argument rawValue, Plot plot) throws CommandException {
         Resident pl = townManager.getResident(rawValue.asUUID());
-        if (pl != null && pl.getFirstPlayed() > 0) {
+        if (pl != null && pl.asPhantom(plot.getWorld().unwrap()).getFirstPlayed() > 0) {
             plot.setOwner(pl);
             if (pl == resident) {
                 resident.sendMessage(
@@ -37,13 +37,11 @@ public class PlotOptionOwner extends PlotOption {
                     Text.translation("plot.owner.new.other").yellow()
                         .arg(pl.getName(), Text::gold)
                 );
-                if (pl.isOnline()) {
-                    pl.sendMessage(
-                        Text.translation("plot.owner.new.self").yellow()
-                            .arg(plot.getLocation().getChunkX(), Text::gold)
-                            .arg(plot.getLocation().getChunkZ(), Text::gold)
-                    );
-                }
+                pl.sendMessage(
+                    Text.translation("plot.owner.new.self").yellow()
+                        .arg(plot.getLocation().getChunkX(), Text::gold)
+                        .arg(plot.getLocation().getChunkZ(), Text::gold)
+                );
             }
         } else {
             throw new CommandException("commands.generic.player.notFound", rawValue);

@@ -25,7 +25,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import ru.craftlogic.api.event.block.DispenserShootEvent;
 import ru.craftlogic.api.event.block.FarmlandTrampleEvent;
 import ru.craftlogic.api.event.block.FluidFlowEvent;
-import ru.craftlogic.api.event.block.PistonMoveEvent;
+import ru.craftlogic.api.event.block.PistonCheckCanMoveEvent;
 import ru.craftlogic.api.event.player.PlayerCheckCanEditEvent;
 import ru.craftlogic.api.inventory.InventoryHolder;
 import ru.craftlogic.api.text.Text;
@@ -35,7 +35,6 @@ import ru.craftlogic.towns.data.Plot;
 import ru.craftlogic.towns.data.Resident;
 import ru.craftlogic.towns.data.Town;
 
-import javax.annotation.Nullable;
 import java.util.Random;
 
 public class PlotListener {
@@ -436,8 +435,8 @@ public class PlotListener {
     }
 
     @SubscribeEvent
-    public void onPistonMove(PistonMoveEvent event) {
-        onBlockFromTo(event, event.getWorld(), event.getPos(), event.getFacing(), true, null);
+    public void onPistonMove(PistonCheckCanMoveEvent event) {
+        onBlockFromTo(event, event.getWorld(), event.getBlockToMove(), event.getMoveDirection(), true, null);
     }
 
     @SubscribeEvent
@@ -445,7 +444,7 @@ public class PlotListener {
         onBlockFromTo(event, event.getWorld(), event.getPos(), event.getFacing(), false, null);
     }
 
-    private void onBlockFromTo(Event event, net.minecraft.world.World world, BlockPos pos, EnumFacing facing, boolean multiParticles, @Nullable EntityPlayer player) {
+    private void onBlockFromTo(Event event, net.minecraft.world.World world, BlockPos pos, EnumFacing facing, boolean multiParticles, EntityPlayer player) {
         Location from = new Location(world, pos);
         Location to = from.offset(facing);
         Plot targetPlot = this.townManager.getPlot(to);

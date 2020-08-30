@@ -3,12 +3,16 @@ package ru.craftlogic.towns.data;
 import com.google.gson.JsonObject;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.command.CommandException;
+import net.minecraft.command.ICommandSender;
 import net.minecraft.util.JsonUtils;
+import net.minecraft.util.text.ITextComponent;
 import ru.craftlogic.api.economy.EconomyManager;
+import ru.craftlogic.api.server.Server;
 import ru.craftlogic.api.text.Text;
 import ru.craftlogic.api.world.ChunkLocation;
+import ru.craftlogic.api.world.CommandSender;
 import ru.craftlogic.api.world.Dimension;
-import ru.craftlogic.api.world.PhantomPlayer;
+import ru.craftlogic.api.world.OfflinePlayer;
 import ru.craftlogic.towns.TownManager;
 import ru.craftlogic.towns.event.TownRemoveResidentEvent;
 import ru.craftlogic.towns.utils.FloatFunction;
@@ -23,7 +27,7 @@ import java.util.function.Predicate;
 
 import static ru.craftlogic.towns.CraftTowns.GSON;
 
-public class Resident extends PhantomPlayer implements PlotOwner {
+public class Resident extends OfflinePlayer implements PlotOwner, CommandSender {
     private final TownManager townManager;
     private UUID town;
     private String title;
@@ -31,7 +35,7 @@ public class Resident extends PhantomPlayer implements PlotOwner {
     private Set<UUID> friends = new HashSet<>();
 
     public Resident(TownManager townManager, GameProfile profile) {
-        super(townManager.getServer().getWorldManager().get(Dimension.OVERWORLD), profile); //FIXME Overworld
+        super(townManager.getServer(), profile);
         this.townManager = townManager;
     }
 
@@ -119,11 +123,6 @@ public class Resident extends PhantomPlayer implements PlotOwner {
             }
         }
         return result;
-    }
-
-    @Override
-    public long getTimePlayed() {
-        return getLastPlayed() - getFirstPlayed();
     }
 
     public float getBalance() {
@@ -255,6 +254,37 @@ public class Resident extends PhantomPlayer implements PlotOwner {
     @Override
     public int hashCode() {
         return getId().hashCode();
+    }
+
+    @Override
+    public Server getServer() {
+        return townManager.getServer();
+    }
+
+    @Override
+    public void sendMessage(ITextComponent message) {
+        if (isOnline()) {
+            asOnline().sendMessage(message);
+        }
+    }
+
+    @Override
+    public void sendMessage(Text<?, ?> text) {
+        if (isOnline()) {
+            asOnline().sendMessage(text);
+        }
+    }
+
+    @Override
+    public void sendMessage(String format, Object... args) {
+        if (isOnline()) {
+            asOnline().sendMessage(format, args);
+        }
+    }
+
+    @Override
+    public ICommandSender unwrap() {
+        return (isOnline() ? asOnline() : asPhantom(getServer().getWorldManager().get(Dimension.OVERWORLD))).unwrap();
     }
 
     public enum ResidentStatus {
