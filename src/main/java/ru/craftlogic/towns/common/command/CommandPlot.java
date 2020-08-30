@@ -89,7 +89,7 @@ public class CommandPlot extends CommandBase {
                                             //...
                                         }
                                         player.sendMessage(
-                                            Text.translation("plot.unlock.successul").green()
+                                            Text.translation("plot.unlock.successful").green()
                                         );
                                     } else {
                                         throw new CommandException("plot.claim.insufficient-money", fmt.apply(amt));
@@ -270,7 +270,7 @@ public class CommandPlot extends CommandBase {
                                 if (plot.hasTown() && plot.getTown().isAuthority(resident) || player.hasPermission("town.admin")) {
                                     plot.setLocked(false);
                                     player.sendMessage(
-                                        Text.translation("plot.unlock.successul").green()
+                                        Text.translation("plot.unlock.successful").green()
                                     );
                                 } else {
                                     throw new CommandException("plot.unlock.owner-only");
@@ -292,7 +292,7 @@ public class CommandPlot extends CommandBase {
                                                 //...
                                             }
                                             player.sendMessage(
-                                                Text.translation("plot.unlock.successul").green()
+                                                Text.translation("plot.unlock.successful").green()
                                             );
                                         } else {
                                             throw new CommandException("plot.claim.insufficient-money", fmt.apply(amt).build());
