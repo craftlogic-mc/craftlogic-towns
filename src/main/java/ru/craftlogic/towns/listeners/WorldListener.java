@@ -1,6 +1,7 @@
 package ru.craftlogic.towns.listeners;
 
 import net.minecraftforge.event.world.WorldEvent;
+import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import ru.craftlogic.api.server.Server;
 import ru.craftlogic.api.world.Dimension;
@@ -20,7 +21,7 @@ public class WorldListener {
 
     @SubscribeEvent
     public void onWorldLoad(WorldEvent.Load event) {
-        Server server = Server.from(event.getWorld().getMinecraftServer());
+        Server server = Server.from(FMLCommonHandler.instance().getMinecraftServerInstance());
         Dimension dimension = Dimension.fromVanilla(event.getWorld().provider.getDimensionType());
         if (this.townManager.enabledWorlds.contains(dimension.getName())) {
             TownWorld tw = TownWorld.load(this.townManager, World.fromVanilla(server, event.getWorld()));
